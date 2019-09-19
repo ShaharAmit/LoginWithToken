@@ -1,19 +1,19 @@
 
-const express = require('express')
-const User = require('../models/User')
-const auth = require('../middleware/auth')
-const jwt = require('jsonwebtoken')
-
-const router = express.Router()
+const express = require('express'),
+    User = require('../models/User'),
+    auth = require('../middleware/auth'),
+    jwt = require('jsonwebtoken'),
+    router = express.Router()
 
 router.post('/users/new', async (req, res) => {
     // Create a new user
     try {
         const user = new User(req.body)
         await user.save()
-        res.status(201).send({ res: "success" })
+        res.status(201).send({name: user.name})
     } catch (error) {
-        res.status(400).send({ res:error })
+        console.log(error)
+        res.status(400).send(error.message)
     }
 })
 
@@ -27,8 +27,21 @@ router.post('/users/login', async(req, res) => {
         }
         const refreshToken = await user.generateRefreshToken()
         const accessToken = await user.generateAccessToken()
-        res.send({ refresh: refreshToken,access: accessToken })
+        res.cookie("refresh",refreshToken,{
+            maxAge: 1000 * 60 * 60 * 24 * 30, // would expire after 30 days
+            httpOnly: true, // The cookie only accessible by the web server
+            signed: true // Indicates if the cookie should be signed
+        })
+        res.cookie("access",accessToken,{
+            maxAge: 1000 * 60 * 60, // would expire after 60 minutes
+            httpOnly: true, // The cookie only accessible by the web server
+            signed: true // Indicates if the cookie should be signed
+        })
+        res.send({ 
+            name: user.name
+        })
     } catch (error) {
+        console.log(error.message)
         res.status(400).send(error.message)
     }
 })
@@ -43,14 +56,20 @@ router.get('/users/me',async(req, res) => {
         const user = await User.findOne({ _id: data._id, 'tokens.token': token })
         if (user && data._time >= startDate.getTime() && data._time <= endDate.getTime()) {
             const accessToken = await user.generateAccessToken()
-            res.send({ access: accessToken})
+            res.cookie("access",refreshToken,{
+                maxAge: 1000 * 60 * 60, // would expire after 60 minutes
+                httpOnly: true, // The cookie only accessible by the web server
+                signed: true // Indicates if the cookie should be signed
+            })
+            res.send({ 
+                name: user.name
+            })
         } else {
             throw new Error()
         }
     } catch (error) {
         res.status(401).send({ error: 'Not authorized to access this resource' })
     }
-    // View logged in user profile
 })
 
 
@@ -61,7 +80,9 @@ router.post('/users/me/logout', auth, async (req, res) => {
             return token.token != req.token
         })
         await req.user.save()
-        res.send()
+        res.send({
+            logout: 'success'
+        })
     } catch (error) {
         res.status(500).send(error)
     }
@@ -72,10 +93,12 @@ router.post('/users/me/logoutall', auth, async(req, res) => {
     try {
         req.user.tokens.splice(0, req.user.tokens.length)
         await req.user.save()
-        res.send()
+        res.send({
+            logoutAll: 'success'
+        })    
     } catch (error) {
         res.status(500).send(error)
     }
 })
 
-module.exports = router
+module.exports = router 

@@ -84,6 +84,6 @@ userSchema.statics.findByCredentials = async (email, password) => {
     return user
 }
 
-const User = mongoose.model('User', userSchema)
+const User = mongoose.model('User', userSchema,"Users")
 
-module.exports = User
+module.exports = User 
